@@ -30,7 +30,6 @@ import com.xuexiang.xutil.data.DateUtils
 import com.xuexiang.xutil.resource.ResUtils.getString
 import java.text.SimpleDateFormat
 import java.util.Locale
-import androidx.annotation.RequiresPermission
 import com.google.gson.annotations.SerializedName
 import java.io.File
 import java.io.FileOutputStream

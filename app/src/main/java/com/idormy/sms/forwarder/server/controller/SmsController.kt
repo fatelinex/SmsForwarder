@@ -63,7 +63,7 @@ class SmsController {
         Log.d(TAG, App.SimInfoList.toString())
 
         //发送卡槽: 1=SIM1, 2=SIM2
-        val simSlotIndex = smsSendData.simSlot - 1
+        val simSlotIndex = mmsSendData.simSlot - 1
         //TODO：取不到卡槽信息时，采用默认卡槽发送
         val mSubscriptionId: Int = App.SimInfoList[simSlotIndex]?.mSubscriptionId ?: -1
 
@@ -71,7 +71,7 @@ class SmsController {
             return getString(R.string.no_sms_sending_permission)
         }
 
-        PhoneUtils.sendMms(XUtil.getContext(), mSubscriptionId, mmsSendData.phoneNumbers, mmsSendData.imageUri)
+        PhoneUtils.sendMms(XUtil.getContext(), mSubscriptionId, mmsSendData.phoneNumbers, mmsSendData.imageUrl)
         return "success"
     }
 
