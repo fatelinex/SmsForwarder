@@ -25,6 +25,7 @@ class SmsController {
 
     //发送短信
     @CrossOrigin(methods = [RequestMethod.POST])
+    @PostMapping("/send")
     fun send(@RequestBody bean: BaseRequest<SmsSendData>): String {
         Log.d(TAG, "Entering send function")
         val smsSendData = bean.data
