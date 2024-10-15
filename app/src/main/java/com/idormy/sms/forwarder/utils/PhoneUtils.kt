@@ -249,43 +249,54 @@ class PhoneUtils private constructor() {
         @Suppress("DEPRECATION")
         @RequiresPermission(permission.SEND_SMS)
         fun sendMms(context: Context, subId: Int, mobileList: String, imageUrl: String): String? {
+            Log.d(TAG, "Entering sendMms function")
+            Log.d(TAG, "Parameters: subId=$subId, mobileList=$mobileList, imageUrl=$imageUrl")
+
             if (TextUtils.isEmpty(mobileList) || TextUtils.isEmpty(imageUrl)) {
                 Log.e(TAG, "mobileList or imageUrl is empty!")
                 return "mobileList or imageUrl is empty!"
             }
 
             val mobiles = mobileList.replace("；", ";").replace("，", ";").replace(",", ";")
-            Log.d(TAG, "subId = $subId, mobiles = $mobiles, imageUrl = $imageUrl")
+            Log.d(TAG, "Processed mobiles: $mobiles")
             val mobileArray = mobiles.split(";".toRegex()).toTypedArray()
+            Log.d(TAG, "Number of recipients: ${mobileArray.size}")
+
             for (mobile in mobileArray) {
-                Log.d(TAG, "mobile = $mobile")
+                Log.d(TAG, "Processing mobile: $mobile")
                 if (!isValidPhoneNumber(mobile)) {
-                    Log.e(TAG, "mobile ($mobile) is invalid!")
+                    Log.e(TAG, "Mobile ($mobile) is invalid! Skipping.")
                     continue
                 }
 
                 try {
+                    Log.d(TAG, "Preparing to send MMS to $mobile")
                     val sendFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_ONE_SHOT
                     val sendPI = PendingIntent.getBroadcast(context, 0, Intent("MMS_SENT_ACTION"), sendFlags)
+                    Log.d(TAG, "Created PendingIntent with flags: $sendFlags")
 
                     // 获取 SmsManager 实例
                     val smsManager = if (subId > -1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+                        Log.d(TAG, "Using SmsManager for specific subscription ID: $subId")
                         SmsManager.getSmsManagerForSubscriptionId(subId)
                     } else {
+                        Log.d(TAG, "Using default SmsManager")
                         SmsManager.getDefault()
                     }
 
                     // Android 5.1.1 以下使用反射指定卡槽
                     if (subId > -1 && Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP_MR1) {
-                        Log.d(TAG, "Android 5.1.1 以下使用反射指定卡槽")
+                        Log.d(TAG, "Android version below 5.1.1, using reflection to set subId")
                         val clz = SmsManager::class.java
                         val field = clz.getDeclaredField("mSubId")
                         field.isAccessible = true
                         field.set(smsManager, subId)
+                        Log.d(TAG, "Set subId using reflection: $subId")
                     }
 
                     // 下载远程图片到本地
                     val imageUri: Uri = try {
+                        Log.d(TAG, "Starting image download from $imageUrl")
                         val url = URL(imageUrl)
                         val connection = url.openConnection() as HttpURLConnection
                         connection.doInput = true
@@ -299,12 +310,14 @@ class PhoneUtils private constructor() {
                         }
                         val uniqueId = System.currentTimeMillis()
                         val finalFileName = "${uniqueId}_$fileName"
+                        Log.d(TAG, "Generated file name: $finalFileName")
                         val file = File(context.cacheDir, finalFileName)
                         FileOutputStream(file).use { output ->
                             inputStream.use { input ->
                                 input.copyTo(output)
                             }
                         }
+                        Log.d(TAG, "Image downloaded and saved to ${file.absolutePath}")
                         Uri.fromFile(file)
                     } catch (e: Exception) {
                         Log.e(TAG, "Failed to download image", e)
@@ -313,10 +326,10 @@ class PhoneUtils private constructor() {
 
                     // 发送彩信
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        // Android 5.0 及以上直接使用 sendMultimediaMessage 方法发送
+                        Log.d(TAG, "Android 5.0 or above, using sendMultimediaMessage")
                         smsManager.sendMultimediaMessage(context, imageUri, null, null, sendPI)
+                        Log.d(TAG, "MMS sent successfully to $mobile")
                     } else {
-                        // Android 5.0 以下不支持直接发送彩信，需要其他实现方式
                         Log.w(TAG, "MMS sending is not fully supported below Android 5.0")
                         // 可以在此实现兼容低版本的逻辑
                     }
@@ -326,6 +339,7 @@ class PhoneUtils private constructor() {
                 }
             }
 
+            Log.d(TAG, "Exiting sendMms function successfully")
             return null
         }
 
