@@ -45,12 +45,13 @@ class SmsController {
             return getString(R.string.no_sms_sending_permission)
         }
 
-        return if (smsSendData.imageUrl.isNullOrEmpty()) {
+        val imageUrl = smsSendData.imageUrl
+        return if (imageUrl.isNullOrEmpty()) {
             // 发送短信
             PhoneUtils.sendSms(mSubscriptionId, smsSendData.phoneNumbers, smsSendData.msgContent) ?: "success"
         } else {
             // 发送彩信
-            PhoneUtils.sendMms(XUtil.getContext(), mSubscriptionId, smsSendData.phoneNumbers, smsSendData.imageUrl)
+            PhoneUtils.sendMms(XUtil.getContext(), mSubscriptionId, smsSendData.phoneNumbers, imageUrl)
             "success"
         }
     }
