@@ -2,12 +2,14 @@ package com.idormy.sms.forwarder.server.controller
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import com.idormy.sms.forwarder.utils.Log
 import androidx.core.app.ActivityCompat
 import com.idormy.sms.forwarder.App
 import com.idormy.sms.forwarder.R
 import com.idormy.sms.forwarder.entity.SmsInfo
 import com.idormy.sms.forwarder.server.model.BaseRequest
+import com.idormy.sms.forwarder.server.model.MmsSendData
 import com.idormy.sms.forwarder.server.model.SmsQueryData
 import com.idormy.sms.forwarder.server.model.SmsSendData
 import com.idormy.sms.forwarder.utils.PhoneUtils
@@ -45,6 +47,32 @@ class SmsController {
         }
 
         return PhoneUtils.sendSms(mSubscriptionId, smsSendData.phoneNumbers, smsSendData.msgContent) ?: "success"
+    }
+
+    //发送彩信
+    @CrossOrigin(methods = [RequestMethod.POST])
+    @PostMapping("/sendMms")
+    fun sendMms(@RequestBody bean: BaseRequest<MmsSendData>): String {
+        val mmsSendData = bean.data
+        Log.d(TAG, mmsSendData.toString())
+
+        //获取卡槽信息
+        if (App.SimInfoList.isEmpty()) {
+            App.SimInfoList = PhoneUtils.getSimMultiInfo()
+        }
+        Log.d(TAG, App.SimInfoList.toString())
+
+        //发送卡槽: 1=SIM1, 2=SIM2
+        val simSlotIndex = smsSendData.simSlot - 1
+        //TODO：取不到卡槽信息时，采用默认卡槽发送
+        val mSubscriptionId: Int = App.SimInfoList[simSlotIndex]?.mSubscriptionId ?: -1
+
+        if (ActivityCompat.checkSelfPermission(XUtil.getContext(), Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
+            return getString(R.string.no_sms_sending_permission)
+        }
+
+        PhoneUtils.sendMms(XUtil.getContext(), mSubscriptionId, mmsSendData.phoneNumbers, mmsSendData.imageUri)
+        return "success"
     }
 
     //查询短信

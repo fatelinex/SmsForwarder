@@ -30,6 +30,13 @@ import com.xuexiang.xutil.data.DateUtils
 import com.xuexiang.xutil.resource.ResUtils.getString
 import java.text.SimpleDateFormat
 import java.util.Locale
+import androidx.annotation.RequiresPermission
+import com.google.gson.annotations.SerializedName
+import java.io.File
+import java.io.FileOutputStream
+import java.io.Serializable
+import java.net.HttpURLConnection
+import java.net.URL
 
 @Suppress("DEPRECATION")
 class PhoneUtils private constructor() {
@@ -229,6 +236,101 @@ class PhoneUtils private constructor() {
 
             return null
         }
+
+
+        /**
+        * 发送彩信
+        * <p>需添加权限 {@code <uses-permission android:name="android.permission.SEND_SMS" />}</p>
+        *
+        * @param context 应用上下文
+        * @param subId 发送卡的 subId，传入 -1 则使用 SmsManager.getDefault()
+        * @param mobileList 接收号码列表，用分号隔开
+        * @param imageUrl 彩信的多媒体内容 URL
+        */
+        @Suppress("DEPRECATION")
+        @RequiresPermission(permission.SEND_SMS)
+        fun sendMms(context: Context, subId: Int, mobileList: String, imageUrl: String): String? {
+            if (TextUtils.isEmpty(mobileList) || TextUtils.isEmpty(imageUrl)) {
+                Log.e(TAG, "mobileList or imageUrl is empty!")
+                return "mobileList or imageUrl is empty!"
+            }
+
+            val mobiles = mobileList.replace("；", ";").replace("，", ";").replace(",", ";")
+            Log.d(TAG, "subId = $subId, mobiles = $mobiles, imageUrl = $imageUrl")
+            val mobileArray = mobiles.split(";".toRegex()).toTypedArray()
+            for (mobile in mobileArray) {
+                Log.d(TAG, "mobile = $mobile")
+                if (!isValidPhoneNumber(mobile)) {
+                    Log.e(TAG, "mobile ($mobile) is invalid!")
+                    continue
+                }
+
+                try {
+                    val sendFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_ONE_SHOT
+                    val sendPI = PendingIntent.getBroadcast(context, 0, Intent("MMS_SENT_ACTION"), sendFlags)
+
+                    // 获取 SmsManager 实例
+                    val smsManager = if (subId > -1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+                        SmsManager.getSmsManagerForSubscriptionId(subId)
+                    } else {
+                        SmsManager.getDefault()
+                    }
+
+                    // Android 5.1.1 以下使用反射指定卡槽
+                    if (subId > -1 && Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP_MR1) {
+                        Log.d(TAG, "Android 5.1.1 以下使用反射指定卡槽")
+                        val clz = SmsManager::class.java
+                        val field = clz.getDeclaredField("mSubId")
+                        field.isAccessible = true
+                        field.set(smsManager, subId)
+                    }
+
+                    // 下载远程图片到本地
+                    val imageUri: Uri = try {
+                        val url = URL(imageUrl)
+                        val connection = url.openConnection() as HttpURLConnection
+                        connection.doInput = true
+                        connection.connectTimeout = 5000
+                        connection.readTimeout = 5000
+
+                        val inputStream = connection.inputStream
+                        val fileName = run {
+                            val rawFileName = imageUrl.substringAfterLast('/').substringBefore('?')
+                            if (rawFileName.isBlank()) "downloaded_image.jpg" else rawFileName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                        }
+                        val uniqueId = System.currentTimeMillis()
+                        val finalFileName = "${uniqueId}_$fileName"
+                        val file = File(context.cacheDir, finalFileName)
+                        FileOutputStream(file).use { output ->
+                            inputStream.use { input ->
+                                input.copyTo(output)
+                            }
+                        }
+                        Uri.fromFile(file)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to download image", e)
+                        return "Failed to download image: ${e.message}"
+                    }
+
+                    // 发送彩信
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        // Android 5.0 及以上直接使用 sendMultimediaMessage 方法发送
+                        smsManager.sendMultimediaMessage(context, imageUri, null, null, sendPI)
+                    } else {
+                        // Android 5.0 以下不支持直接发送彩信，需要其他实现方式
+                        Log.w(TAG, "MMS sending is not fully supported below Android 5.0")
+                        // 可以在此实现兼容低版本的逻辑
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "sendMms failed for mobile ($mobile)", e)
+                    return e.message.toString()
+                }
+            }
+
+            return null
+        }
+
+
 
         //获取通话记录列表
         fun getCallInfoList(
