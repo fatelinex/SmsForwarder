@@ -9,7 +9,6 @@ import com.idormy.sms.forwarder.App
 import com.idormy.sms.forwarder.R
 import com.idormy.sms.forwarder.entity.SmsInfo
 import com.idormy.sms.forwarder.server.model.BaseRequest
-import com.idormy.sms.forwarder.server.model.MmsSendData
 import com.idormy.sms.forwarder.server.model.SmsQueryData
 import com.idormy.sms.forwarder.server.model.SmsSendData
 import com.idormy.sms.forwarder.utils.PhoneUtils
@@ -46,34 +45,16 @@ class SmsController {
             return getString(R.string.no_sms_sending_permission)
         }
 
-        return PhoneUtils.sendSms(mSubscriptionId, smsSendData.phoneNumbers, smsSendData.msgContent) ?: "success"
+        return if (smsSendData.imageUrl.isNullOrEmpty()) {
+            // 发送短信
+            PhoneUtils.sendSms(mSubscriptionId, smsSendData.phoneNumbers, smsSendData.msgContent) ?: "success"
+        } else {
+            // 发送彩信
+            PhoneUtils.sendMms(XUtil.getContext(), mSubscriptionId, smsSendData.phoneNumbers, smsSendData.imageUrl)
+            "success"
+        }
     }
 
-    //发送彩信
-    @CrossOrigin(methods = [RequestMethod.POST])
-    @PostMapping("/sendMms")
-    fun sendMms(@RequestBody bean: BaseRequest<MmsSendData>): String {
-        val mmsSendData = bean.data
-        Log.d(TAG, mmsSendData.toString())
-
-        //获取卡槽信息
-        if (App.SimInfoList.isEmpty()) {
-            App.SimInfoList = PhoneUtils.getSimMultiInfo()
-        }
-        Log.d(TAG, App.SimInfoList.toString())
-
-        //发送卡槽: 1=SIM1, 2=SIM2
-        val simSlotIndex = mmsSendData.simSlot - 1
-        //TODO：取不到卡槽信息时，采用默认卡槽发送
-        val mSubscriptionId: Int = App.SimInfoList[simSlotIndex]?.mSubscriptionId ?: -1
-
-        if (ActivityCompat.checkSelfPermission(XUtil.getContext(), Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
-            return getString(R.string.no_sms_sending_permission)
-        }
-
-        PhoneUtils.sendMms(XUtil.getContext(), mSubscriptionId, mmsSendData.phoneNumbers, mmsSendData.imageUrl)
-        return "success"
-    }
 
     //查询短信
     @CrossOrigin(methods = [RequestMethod.POST])

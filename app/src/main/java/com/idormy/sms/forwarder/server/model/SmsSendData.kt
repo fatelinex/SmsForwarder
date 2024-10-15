@@ -10,4 +10,6 @@ data class SmsSendData(
     var phoneNumbers: String,
     @SerializedName("msg_content")
     var msgContent: String,
+    @SerializedName("image_url")
+    var imageUrl: String? = null
 ) : Serializable
